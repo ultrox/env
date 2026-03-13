@@ -11,7 +11,7 @@ Env vars are strings. You need to know: is it present? What type? Any length con
 - Zero runtime dependencies
 - Full TypeScript inference — `parse()` returns typed data matching your schema
 - Immutable builder API — `.min()`, `.max()` return new descriptors
-- Built-in CLI — reads `.env` files, `SECRETS_JSON`, writes validated output
+- Built-in CLI for CI pipelines
 
 ## Install
 
@@ -24,7 +24,7 @@ npm install @ma.vu/env
 ### Define a schema
 
 ```ts
-// bin/env.ts
+// src/server/config.ts
 import { createEnv, required, optional, number, boolean } from '@ma.vu/env';
 
 export const env = createEnv({
@@ -34,19 +34,22 @@ export const env = createEnv({
   PORT: number,
   DEBUG: boolean,
 });
+
+// Lazy — called by the app, not by the CLI
+export function loadConfig() {
+  const { data, errors, warnings } = env.parse(process.env);
+  if (errors.length) throw new Error(errors.join('\n'));
+  if (warnings.length) console.warn(`Optional: ${warnings.join(', ')}`);
+  return { config: data, configWarnings: warnings };
+}
 ```
 
-### Validate at runtime
+### Use in your app
 
 ```ts
-// src/server/config.ts
-import { env } from '../bin/env.js';
+import { loadConfig } from './config.js';
 
-const { data, errors, warnings } = env.parse(process.env);
-if (errors.length) throw new Error(errors.join('\n'));
-if (warnings.length) console.warn(`Optional: ${warnings.join(', ')}`);
-
-export const config = data;
+const { config } = loadConfig();
 // config.CLERK_SECRET_KEY → string
 // config.PORT             → number
 // config.DEBUG            → boolean
@@ -56,17 +59,60 @@ export const config = data;
 
 ```ts
 // bin/validate-env.ts
-import { env } from './env.js';
+import { env } from '../src/server/config.js';
 env.cli();
 ```
 
-```bash
-# Validate an existing .env file
-npx tsx bin/validate-env.ts .env
+The CLI script imports `env` (the schema) without triggering `loadConfig()`, so it doesn't try to parse `process.env`.
 
-# Generate .env from CI secrets
+## Two ways to use: `parse()` vs `cli()`
+
+### `parse(source)` — for your app at runtime
+
+Takes any `Record<string, string | undefined>` (like `process.env`) and validates each key against the schema. Returns `{ data, errors, warnings }`. You call it, you handle the result.
+
+```ts
+const { data, errors, warnings } = env.parse(process.env);
+```
+
+### `cli()` — for CI pipelines
+
+Reads args, determines the source, validates, and writes output. It handles the full flow and calls `process.exit()` on failure.
+
+The CLI has its own convention for reading env vars. It does **not** read `process.env` directly. Instead it supports two modes:
+
+**Validate mode** — reads a `.env` file and validates it:
+
+```bash
+npx tsx bin/validate-env.ts .env
+```
+
+Parses the file as `KEY=value` lines (ignoring comments and blank lines), then validates against the schema. Exits 0 on success, 1 on error.
+
+**Write mode** — reads from `SECRETS_JSON`, validates, and writes a `.env` file:
+
+```bash
 npx tsx bin/validate-env.ts --write .env.deploy
-# (reads from SECRETS_JSON env var)
+```
+
+Expects a `SECRETS_JSON` environment variable containing a JSON object of key-value pairs. Extracts only the keys defined in the schema, validates them, and writes the result as a `.env` file. This is designed for CI where secrets are available as a JSON blob (e.g. GitHub Actions `${{ toJSON(secrets) }}`).
+
+**Why `SECRETS_JSON`?** — CI platforms like GitHub Actions can dump all secrets into one env var with `toJSON(secrets)`. The CLI unpacks it so you don't have to list each secret individually in the workflow. Add a key to your schema and it automatically gets picked up from the JSON — no workflow changes needed.
+
+### Example GitHub Actions workflow
+
+```yaml
+- uses: pnpm/action-setup@v4
+- uses: actions/setup-node@v4
+  with:
+    node-version: 20
+    cache: pnpm
+- run: pnpm install --frozen-lockfile
+
+- name: Generate and validate .env
+  run: npx tsx bin/validate-env.ts --write .env.deploy
+  env:
+    SECRETS_JSON: ${{ toJSON(secrets) }}
 ```
 
 ## API
@@ -96,16 +142,9 @@ number.min(1).max(65535) // numeric range
 
 Returns an object with:
 
-- **`parse(source)`** — validates `source` (e.g. `process.env`), returns `{ data, errors, warnings }`
-- **`cli()`** — reads args, validates, writes `.env`, exits with code
+- **`parse(source)`** — validates `source` against the schema, returns `{ data, errors, warnings }`
+- **`cli()`** — CLI runner with validate and write modes (see above)
 - **`keys`** — array of all keys from the schema
-
-### CLI modes
-
-| Usage | Behavior |
-|-------|----------|
-| `script .env` | Validates the `.env` file |
-| `script --write .env.deploy` | Reads `SECRETS_JSON` env var, validates, writes output file |
 
 ## License
 
