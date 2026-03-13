@@ -1,8 +1,10 @@
 {
   "name": "@ma.vu/env",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Zero-dependency env validation with builder API",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -17,6 +19,11 @@
     "test": "node --test --import tsx/esm test/index.test.ts",
     "test:coverage": "node --test --experimental-test-coverage --import tsx/esm test/index.test.ts"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ultrox/env"
+  },
+  "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
