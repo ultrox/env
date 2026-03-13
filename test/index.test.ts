@@ -1,5 +1,9 @@
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
+import { spawnSync } from "node:child_process";
+import { writeFileSync, readFileSync, mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   createEnv,
   required,
@@ -201,5 +205,139 @@ describe("createEnv — keys", () => {
   it("returns all schema keys", () => {
     const env = createEnv({ A: required, B: optional, C: number });
     assert.deepEqual(env.keys, ["A", "B", "C"]);
+  });
+});
+
+// — CLI tests (spawn cli-helper.ts) ——————————————————————————————————————
+
+const CLI = join(import.meta.dirname!, "cli-helper.ts");
+
+function run(
+  args: string[],
+  env?: Record<string, string>,
+): { stdout: string; stderr: string; code: number } {
+  const r = spawnSync("node", ["--import", "tsx/esm", CLI, ...args], {
+    env: { ...process.env, ...env },
+    encoding: "utf-8",
+    timeout: 5000,
+  });
+  return {
+    stdout: r.stdout ?? "",
+    stderr: r.stderr ?? "",
+    code: r.status ?? 1,
+  };
+}
+
+describe("cli — validate mode", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "env-test-"));
+
+  it("valid .env → exit 0", () => {
+    const envFile = join(tmp, "valid.env");
+    writeFileSync(envFile, "HOST=localhost\nPORT=3000\nAPI_KEY=secret\n");
+    const { code, stdout } = run([envFile]);
+    assert.equal(code, 0);
+    assert.ok(stdout.includes("[env] OK"));
+  });
+
+  it("valid .env with comments and blank lines", () => {
+    const envFile = join(tmp, "comments.env");
+    writeFileSync(envFile, "# comment\n\nHOST=localhost\nPORT=8080\n");
+    const { code } = run([envFile]);
+    assert.equal(code, 0);
+  });
+
+  it("missing required → exit 1 with error", () => {
+    const envFile = join(tmp, "missing.env");
+    writeFileSync(envFile, "PORT=3000\n");
+    const { code, stderr } = run([envFile]);
+    assert.equal(code, 1);
+    assert.ok(stderr.includes("HOST: required"));
+  });
+
+  it("invalid number → exit 1", () => {
+    const envFile = join(tmp, "bad-num.env");
+    writeFileSync(envFile, "HOST=ok\nPORT=abc\n");
+    const { code, stderr } = run([envFile]);
+    assert.equal(code, 1);
+    assert.ok(stderr.includes("expected number"));
+  });
+
+  it("warns about missing optional", () => {
+    const envFile = join(tmp, "no-optional.env");
+    writeFileSync(envFile, "HOST=localhost\nPORT=3000\n");
+    const { code, stderr } = run([envFile]);
+    assert.equal(code, 0);
+    assert.ok(stderr.includes("Missing optional: API_KEY"));
+  });
+});
+
+describe("cli — write mode", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "env-test-write-"));
+
+  it("writes .env from SECRETS_JSON → exit 0", () => {
+    const outFile = join(tmp, "out.env");
+    const secrets = JSON.stringify({
+      HOST: "prod.example.com",
+      PORT: "443",
+      API_KEY: "sk-123",
+    });
+    const { code, stdout } = run(["--write", outFile], {
+      SECRETS_JSON: secrets,
+    });
+    assert.equal(code, 0);
+    assert.ok(stdout.includes("[env] Wrote"));
+    const content = readFileSync(outFile, "utf-8");
+    assert.ok(content.includes("HOST=prod.example.com"));
+    assert.ok(content.includes("PORT=443"));
+    assert.ok(content.includes("API_KEY=sk-123"));
+  });
+
+  it("skips empty optional values in output", () => {
+    const outFile = join(tmp, "sparse.env");
+    const secrets = JSON.stringify({ HOST: "h", PORT: "80" });
+    const { code } = run(["--write", outFile], { SECRETS_JSON: secrets });
+    assert.equal(code, 0);
+    const content = readFileSync(outFile, "utf-8");
+    assert.ok(!content.includes("API_KEY"));
+  });
+
+  it("no SECRETS_JSON → exit 1", () => {
+    const outFile = join(tmp, "fail.env");
+    const { code, stderr } = run(["--write", outFile], { SECRETS_JSON: "" });
+    assert.equal(code, 1);
+    assert.ok(stderr.includes("SECRETS_JSON"));
+  });
+
+  it("invalid SECRETS_JSON → exit 1", () => {
+    const outFile = join(tmp, "fail2.env");
+    const { code, stderr } = run(["--write", outFile], {
+      SECRETS_JSON: "not json",
+    });
+    assert.equal(code, 1);
+    assert.ok(stderr.includes("not valid JSON"));
+  });
+
+  it("validation error in write mode → exit 1, no file written", () => {
+    const outFile = join(tmp, "nope.env");
+    const secrets = JSON.stringify({ PORT: "abc" }); // missing HOST, bad PORT
+    const { code, stderr } = run(["--write", outFile], {
+      SECRETS_JSON: secrets,
+    });
+    assert.equal(code, 1);
+    assert.ok(stderr.includes("HOST: required"));
+  });
+});
+
+describe("cli — no args", () => {
+  it("prints usage and exits 1", () => {
+    const { code, stderr } = run([]);
+    assert.equal(code, 1);
+    assert.ok(stderr.includes("Usage"));
+  });
+
+  it("--write without path → usage", () => {
+    const { code, stderr } = run(["--write"]);
+    assert.equal(code, 1);
+    assert.ok(stderr.includes("Usage"));
   });
 });

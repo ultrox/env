@@ -12,7 +12,8 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsup",
-    "test": "node --test --import tsx/esm test/index.test.ts"
+    "test": "node --test --import tsx/esm test/index.test.ts",
+    "test:coverage": "node --test --experimental-test-coverage --import tsx/esm test/index.test.ts"
   },
   "publishConfig": {
     "access": "public"
