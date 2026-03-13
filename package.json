@@ -1,12 +1,12 @@
 {
   "name": "@ma.vu/env",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zero-dependency env validation with builder API",
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "files": ["dist"],
