@@ -8,13 +8,13 @@ export {
   boolean,
 } from "./descriptors.js";
 export type { Descriptor } from "./descriptors.js";
-export type { EnvSchema, InferEnv } from "./parse.js";
+export type { EnvSchema, InferEnv, ParseResult } from "./parse.js";
 
 import type { Descriptor } from "./descriptors.js";
 import { parse, type EnvSchema, type ParseResult } from "./parse.js";
 import { cli as runCli } from "./cli.js";
 
-interface Env<S extends EnvSchema> {
+export interface Env<S extends EnvSchema> {
   parse(source: Record<string, string | undefined>): ParseResult<S>;
   cli(): void;
   keys: (keyof S & string)[];
