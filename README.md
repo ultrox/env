@@ -6,6 +6,10 @@ Zero-dependency env validation with a builder API. Type-safe, no schema library 
 
 ## Why
 
+Most apps validate env vars at runtime — the app boots, reads `process.env`, and crashes if something's missing. By then it's too late: you've deployed, the container is up, and you're staring at logs wondering why nothing works.
+
+The schema should live in its own file so it can be imported by both your app _and_ your CI pipeline. Validate before deploy, not after. If a required var is missing, the build fails — not the production server.
+
 Env vars are strings. You need to know: is it present? What type? Any length constraints? That's it. No reason to pull in a schema library for that.
 
 - Zero runtime dependencies
