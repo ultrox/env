@@ -73,7 +73,7 @@ env.writeEnvFile({ source, output });
   run: npx tsx bin/validate-env.ts '${{ toJSON(secrets) }}' .env.deploy
 ```
 
-`toJSON(secrets)` dumps all GitHub secrets as a JSON string. `writeEnvFile` accepts it directly (string or object), validates against the schema (throws on errors), and writes a `.env` file. Empty optional values are skipped.
+[`secrets`](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions) is a GitHub Actions context object containing all repo secrets. [`toJSON()`](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/evaluate-expressions#tojson) serializes it into a single JSON string so you don't have to list each secret individually. `writeEnvFile` accepts it directly (string or object), validates against the schema (throws on errors), and writes a `.env` file. Empty optional values are skipped.
 
 ## API
 
