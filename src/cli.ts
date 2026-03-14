@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import type { EnvSchema, InferEnv } from "./parse.js";
 
 interface WriteEnvFileOptions {
-  source: Record<string, string | undefined>;
+  source: string | Record<string, string | undefined>;
   output: string;
 }
 
@@ -17,7 +17,24 @@ export function writeEnvFile<S extends EnvSchema>(
   ctx: WriteEnvFileContext<S>,
   options: WriteEnvFileOptions,
 ): void {
-  const { data } = ctx.parse(options.source);
+  let source: Record<string, string | undefined>;
+  if (typeof options.source === "string") {
+    try {
+      source = JSON.parse(options.source);
+    } catch {
+      throw new Error(
+        `writeEnvFile: source is not valid JSON.\nReceived: ${options.source.slice(0, 100)}${options.source.length > 100 ? "..." : ""}`,
+      );
+    }
+    if (typeof source !== "object" || source === null || Array.isArray(source)) {
+      throw new Error(
+        `writeEnvFile: source must be a JSON object, got ${Array.isArray(source) ? "array" : typeof source}`,
+      );
+    }
+  } else {
+    source = options.source;
+  }
+  const { data } = ctx.parse(source);
 
   const lines = ctx.keys
     .filter((key) => {

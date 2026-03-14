@@ -232,4 +232,29 @@ describe("writeEnvFile", () => {
       /expected number/,
     );
   });
+
+  it("accepts JSON string as source", () => {
+    const outFile = join(tmp, "json.env");
+    const json = JSON.stringify({ HOST: "h", PORT: "80", API_KEY: "key" });
+    env.writeEnvFile({ source: json, output: outFile });
+    const content = readFileSync(outFile, "utf-8");
+    assert.ok(content.includes("HOST=h"));
+    assert.ok(content.includes("PORT=80"));
+  });
+
+  it("throws on invalid JSON string", () => {
+    const outFile = join(tmp, "bad-json.env");
+    assert.throws(
+      () => env.writeEnvFile({ source: "not json", output: outFile }),
+      /not valid JSON/,
+    );
+  });
+
+  it("throws on non-object JSON", () => {
+    const outFile = join(tmp, "array.env");
+    assert.throws(
+      () => env.writeEnvFile({ source: "[1,2,3]", output: outFile }),
+      /must be a JSON object/,
+    );
+  });
 });

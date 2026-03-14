@@ -18,7 +18,7 @@ export interface Env<S extends EnvSchema> {
   parse(
     source: Record<string, string | undefined>,
   ): { data: InferEnv<S>; warnings: string[] };
-  writeEnvFile(options: { source: Record<string, string | undefined>; output: string }): void;
+  writeEnvFile(options: { source: string | Record<string, string | undefined>; output: string }): void;
   keys: (keyof S & string)[];
 }
 
