@@ -57,25 +57,20 @@ describe("descriptors", () => {
 describe("parse — required string", () => {
   const env = createEnv({ FOO: required });
 
-  it("missing → error", () => {
-    const { errors } = env.parse({});
-    assert.equal(errors.length, 1);
-    assert.match(errors[0], /FOO: required/);
+  it("missing → throws", () => {
+    assert.throws(() => env.parse({}), /FOO: required/);
   });
 
-  it("empty string → error", () => {
-    const { errors } = env.parse({ FOO: "" });
-    assert.equal(errors.length, 1);
+  it("empty string → throws", () => {
+    assert.throws(() => env.parse({ FOO: "" }), /FOO: required/);
   });
 
-  it("whitespace only → error", () => {
-    const { errors } = env.parse({ FOO: "   " });
-    assert.equal(errors.length, 1);
+  it("whitespace only → throws", () => {
+    assert.throws(() => env.parse({ FOO: "   " }), /FOO: required/);
   });
 
   it("valid → trimmed data", () => {
-    const { data, errors } = env.parse({ FOO: "  hello  " });
-    assert.equal(errors.length, 0);
+    const { data } = env.parse({ FOO: "  hello  " });
     assert.equal(data.FOO, "hello");
   });
 });
@@ -84,8 +79,7 @@ describe("parse — optional string", () => {
   const env = createEnv({ BAR: optional });
 
   it("missing → empty string + warning", () => {
-    const { data, errors, warnings } = env.parse({});
-    assert.equal(errors.length, 0);
+    const { data, warnings } = env.parse({});
     assert.equal(data.BAR, "");
     assert.deepEqual(warnings, ["BAR"]);
   });
@@ -100,50 +94,39 @@ describe("parse — optional string", () => {
 describe("parse — min/max length", () => {
   const env = createEnv({ KEY: required.min(5).max(10) });
 
-  it("too short → error", () => {
-    const { errors } = env.parse({ KEY: "abc" });
-    assert.equal(errors.length, 1);
-    assert.match(errors[0], /min length 5/);
+  it("too short → throws", () => {
+    assert.throws(() => env.parse({ KEY: "abc" }), /min length 5/);
   });
 
-  it("too long → error", () => {
-    const { errors } = env.parse({ KEY: "a".repeat(11) });
-    assert.equal(errors.length, 1);
-    assert.match(errors[0], /max length 10/);
+  it("too long → throws", () => {
+    assert.throws(() => env.parse({ KEY: "a".repeat(11) }), /max length 10/);
   });
 
   it("within range → ok", () => {
-    const { errors } = env.parse({ KEY: "abcdef" });
-    assert.equal(errors.length, 0);
+    const { data } = env.parse({ KEY: "abcdef" });
+    assert.equal(data.KEY, "abcdef");
   });
 });
 
 describe("parse — number", () => {
   const env = createEnv({ PORT: number });
 
-  it("missing → error", () => {
-    const { errors } = env.parse({});
-    assert.equal(errors.length, 1);
-    assert.match(errors[0], /PORT: required/);
+  it("missing → throws", () => {
+    assert.throws(() => env.parse({}), /PORT: required/);
   });
 
-  it("NaN → error", () => {
-    const { errors } = env.parse({ PORT: "abc" });
-    assert.equal(errors.length, 1);
-    assert.match(errors[0], /expected number/);
+  it("NaN → throws", () => {
+    assert.throws(() => env.parse({ PORT: "abc" }), /expected number/);
   });
 
   it("valid → coerced number", () => {
-    const { data, errors } = env.parse({ PORT: "3000" });
-    assert.equal(errors.length, 0);
+    const { data } = env.parse({ PORT: "3000" });
     assert.strictEqual(data.PORT, 3000);
   });
 
   it("respects min/max", () => {
     const env2 = createEnv({ PORT: number.min(1).max(65535) });
-    const { errors } = env2.parse({ PORT: "0" });
-    assert.equal(errors.length, 1);
-    assert.match(errors[0], /min 1/);
+    assert.throws(() => env2.parse({ PORT: "0" }), /min 1/);
   });
 });
 
@@ -171,33 +154,33 @@ describe("parse — boolean", () => {
   });
 
   it("empty → false", () => {
-    const { data, errors } = env.parse({ DEBUG: "" });
-    assert.equal(errors.length, 0);
+    const { data } = env.parse({ DEBUG: "" });
     assert.strictEqual(data.DEBUG, false);
   });
 
   it("missing → false", () => {
-    const { data, errors } = env.parse({});
-    assert.equal(errors.length, 0);
+    const { data } = env.parse({});
     assert.strictEqual(data.DEBUG, false);
   });
 
-  it("invalid → error", () => {
-    const { errors } = env.parse({ DEBUG: "yes" });
-    assert.equal(errors.length, 1);
-    assert.match(errors[0], /expected boolean/);
+  it("invalid → throws", () => {
+    assert.throws(() => env.parse({ DEBUG: "yes" }), /expected boolean/);
   });
 });
 
 describe("parse — multiple errors", () => {
-  it("collects all errors at once", () => {
+  it("collects all errors in one throw", () => {
     const env = createEnv({
       A: required,
       B: required,
       C: number,
     });
-    const { errors } = env.parse({});
-    assert.equal(errors.length, 3);
+    assert.throws(() => env.parse({}), (err: Error) => {
+      assert.ok(err.message.includes("A: required"));
+      assert.ok(err.message.includes("B: required"));
+      assert.ok(err.message.includes("C: required"));
+      return true;
+    });
   });
 });
 

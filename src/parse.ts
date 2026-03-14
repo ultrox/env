@@ -15,16 +15,10 @@ export type InferEnv<S extends EnvSchema> = {
       : string;
 };
 
-export interface ParseResult<S extends EnvSchema> {
-  data: InferEnv<S>;
-  errors: string[];
-  warnings: string[];
-}
-
 export function parse<S extends EnvSchema>(
   schema: S,
   source: Record<string, string | undefined>,
-): ParseResult<S> {
+): { data: InferEnv<S>; warnings: string[] } {
   const data = {} as Record<string, unknown>;
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -101,5 +95,15 @@ export function parse<S extends EnvSchema>(
     }
   }
 
-  return { data: data as InferEnv<S>, errors, warnings };
+  if (errors.length) {
+    throw new Error(
+      `Missing required env vars:\n${errors.join("\n")}`,
+    );
+  }
+
+  if (warnings.length) {
+    console.warn(`Missing optional env vars: ${warnings.join(", ")}`);
+  }
+
+  return { data: data as InferEnv<S>, warnings };
 }

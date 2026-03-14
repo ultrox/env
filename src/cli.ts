@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import type { EnvSchema, ParseResult } from "./parse.js";
+import type { EnvSchema, InferEnv } from "./parse.js";
 
 type Mode =
   | { kind: "validate"; path: string }
@@ -48,7 +48,9 @@ function readSecretsJson(keys: string[]): Record<string, string> {
 
 interface CliContext<S extends EnvSchema> {
   keys: string[];
-  parse(source: Record<string, string | undefined>): ParseResult<S>;
+  parse(
+    source: Record<string, string | undefined>,
+  ): { data: InferEnv<S>; warnings: string[] };
 }
 
 export function cli<S extends EnvSchema>(ctx: CliContext<S>): void {
@@ -59,10 +61,13 @@ export function cli<S extends EnvSchema>(ctx: CliContext<S>): void {
       ? readSecretsJson(ctx.keys)
       : readDotEnv(mode.path);
 
-  const { data, errors, warnings } = ctx.parse(source);
+  let data: InferEnv<S>;
+  let warnings: string[];
 
-  if (errors.length) {
-    console.error(`[env] Invalid:\n${errors.map((e) => `  ${e}`).join("\n")}`);
+  try {
+    ({ data, warnings } = ctx.parse(source));
+  } catch (err) {
+    console.error(`[env] ${(err as Error).message}`);
     process.exit(1);
   }
 
