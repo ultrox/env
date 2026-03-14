@@ -58,8 +58,14 @@ export const config = data;
 // bin/validate-env.ts
 import { env } from '../src/server/config/env.config.js';
 
-const source = JSON.parse(process.argv[2]);
-env.writeEnvFile({ source, output: process.argv[3] });
+const source = process.argv[2];
+const output = process.argv[3];
+
+if (!(source && output)) {
+  throw new Error('Usage: validate-env <json> <output-path>');
+}
+
+env.writeEnvFile({ source, output });
 ```
 
 ```yaml
@@ -67,7 +73,7 @@ env.writeEnvFile({ source, output: process.argv[3] });
   run: npx tsx bin/validate-env.ts '${{ toJSON(secrets) }}' .env.deploy
 ```
 
-`toJSON(secrets)` dumps all GitHub secrets as a JSON string. The script parses it, validates against the schema (throws on errors), and writes a `.env` file. Empty optional values are skipped.
+`toJSON(secrets)` dumps all GitHub secrets as a JSON string. `writeEnvFile` accepts it directly (string or object), validates against the schema (throws on errors), and writes a `.env` file. Empty optional values are skipped.
 
 ## API
 
