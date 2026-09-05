@@ -32,7 +32,7 @@ dotenv .env
 
 Run `direnv allow` after reviewing `.envrc`, then start your app from that shell. Here, `dotenv` is a direnv shell helper; it does not require the npm `dotenv` package. Keep secret-bearing `.env` files out of version control.
 
-In CI and production, have the runner or deployment platform supply the environment before starting the app. Keep the schema reusable so the same rules validate deployment inputs and application configuration. `writeEnvFile()` generates a validated file for an explicit consumer; it does not load that file into `process.env`.
+In CI and production, have the runner or deployment platform supply the environment before starting the app. Keep the schema reusable so the same rules validate deployment inputs and application configuration.
 
 ## Install
 
@@ -98,55 +98,21 @@ npx tsx bin/validate-env.ts && npm run dev
 
 ### Validate deployment inputs in CI
 
-Reuse the schema without importing the application's runtime environment module:
-
-```ts
-// bin/write-env.ts
-import { envSchema } from '../src/env.schema';
-
-const source = process.env.ENV_SOURCE_JSON;
-const output = process.argv[2];
-
-if (source === undefined || !output) {
-  throw new Error('Set ENV_SOURCE_JSON and pass an output path');
-}
-
-envSchema.writeEnvFile({ source, output });
-```
+Run the same validation command with the environment supplied by your CI runner:
 
 ```yaml
-- name: Validate deployment configuration and generate .env
+- name: Validate deployment configuration
   env:
-    ENV_SOURCE_JSON: ${{ toJSON(secrets) }}
-  run: npx tsx bin/write-env.ts .env.deploy
+    API_KEY: ${{ secrets.API_KEY }}
+    DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    PORT: ${{ vars.PORT }}
+    DEBUG: ${{ vars.DEBUG }}
+  run: npx tsx bin/validate-env.ts
 ```
 
-This example assumes the required deployment values are stored in GitHub Actions secrets. JSON is passed through a step environment variable, so quotes in values never become shell syntax. See [GitHub's guidance on intermediate environment variables](https://docs.github.com/en/actions/reference/security/secure-use#use-an-intermediate-environment-variable).
+The command imports the same application environment module used locally, so the same schema and rules apply. Missing or invalid configuration fails the step before deployment. Errors identify keys and rules without printing their values. Pass any optional configuration your app uses through the step environment as well.
 
-Validation or serialization errors fail the command before writing the output. Only schema keys are written; empty optional strings are skipped. Errors identify the failing keys and rules without printing their values or the source JSON. Have the deployment platform explicitly load the generated file. For CI jobs that already receive individual environment variables, run the local validation command directly.
-
-### Choose the file's consumer
-
-`writeEnvFile()` defaults to `format: "dotenv"`. It quotes values for dotenv readers such as direnv and Node's environment-file reader. Those readers disagree about some escape sequences, so values that cannot be preserved across them are rejected before writing. This includes carriage returns and some combinations of apostrophes, double quotes, backslashes, dollars, and newlines. Direct `parse()` validation does not impose these file-format restrictions.
-
-For a file that will be sourced by a POSIX shell, select the shell format:
-
-```ts
-envSchema.writeEnvFile({
-  source,
-  output: 'env.deploy.sh',
-  format: 'shell',
-});
-```
-
-```sh
-. ./env.deploy.sh
-node dist/server.js
-```
-
-Shell output contains safely quoted `export` assignments and preserves quotes, dollar signs, backslashes, and newlines without expanding or executing them. It can also be explicitly sourced from a direnv `.envrc`. Use the dotenv format with direnv's `dotenv` helper; shell output and dotenv output are different formats. Docker Compose and `docker run --env-file` have their own parsing rules, so do not assume either file format is interchangeable with them.
-
-New files are created with owner-only permissions. Existing files retain their permissions. Keep generated secret files out of version control and public artifacts.
+The deployment platform supplies the environment when the app starts, and the application's `env` module validates it again. The library does not read or write environment files.
 
 ### Keep raw environment access at the boundary
 
@@ -194,7 +160,6 @@ number.min(1).max(65535) // numeric range
 Returns an object with:
 
 - **`parse(source)`** — validates a string-valued object against the schema. Throws on errors, warns on missing optional. Returns `{ data, warnings }`. Ignores undeclared keys and inherited properties; rejects non-string values and null bytes.
-- **`writeEnvFile({ source, output, format? })`** — validates an object or JSON string and writes a file. Format is `"dotenv"` (default) or `"shell"`. Throws on validation or serialization errors before writing.
 - **`keys`** — frozen, readonly array of all schema keys. Names must match `[A-Za-z_][A-Za-z0-9_]*`. The schema key-to-descriptor mapping is copied when `createEnv()` is called.
 
 ## Releasing
