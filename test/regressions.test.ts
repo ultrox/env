@@ -13,8 +13,8 @@ const schema = createEnv({ VALUE: required });
 const childEnv = { PATH: process.env.PATH, EXPANSION_CANARY: "expanded" };
 const hasDirenv = spawnSync("direnv", ["version"], { env: childEnv }).status === 0;
 
-function loadShell(script: string): Record<string, string> {
-  const result = spawnSync("/bin/sh", ["-s", "--", process.execPath], {
+function loadShell(script: string, shell = "/bin/sh"): Record<string, string> {
+  const result = spawnSync(shell, ["-s", "--", process.execPath], {
     input: `${script}\nexec "$1" -e 'process.stdout.write(JSON.stringify({ VALUE: process.env.VALUE, INJECTED: process.env.INJECTED }))'`,
     encoding: "utf8",
     env: childEnv,
@@ -52,7 +52,7 @@ describe("validated values survive file loading", () => {
         env: childEnv,
       });
       assert.equal(result.status, 0, result.stderr);
-      assert.deepEqual(loadShell(result.stdout), { VALUE: value });
+      assert.deepEqual(loadShell(result.stdout, "/bin/bash"), { VALUE: value });
     });
   }
 
