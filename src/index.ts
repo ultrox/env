@@ -9,17 +9,14 @@ export {
 } from "./descriptors.js";
 export type { Descriptor } from "./descriptors.js";
 export type { EnvSchema, InferEnv } from "./parse.js";
-export type { WriteEnvFileOptions } from "./cli.js";
 
 import type { Descriptor } from "./descriptors.js";
 import { parse, type EnvSchema, type InferEnv } from "./parse.js";
-import { writeEnvFile as writeEnvFileImpl, type WriteEnvFileOptions } from "./cli.js";
 
 export interface Env<S extends EnvSchema> {
   parse(
     source: Record<string, string | undefined>,
   ): { data: InferEnv<S>; warnings: string[] };
-  writeEnvFile(options: WriteEnvFileOptions): void;
   keys: readonly (keyof S & string)[];
 }
 
@@ -37,9 +34,6 @@ export function createEnv<const S extends Record<string, Descriptor>>(
   return {
     parse(source) {
       return parse(schemaSnapshot, source);
-    },
-    writeEnvFile(options) {
-      writeEnvFileImpl({ keys, parse: (source) => parse(schemaSnapshot, source) }, options);
     },
     keys,
   };

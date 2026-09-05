@@ -19,6 +19,6 @@ env.UNDECLARED;
 env.PORT.toUpperCase();
 // @ts-expect-error Boolean variables must not be assignable to strings.
 const debug: string = env.DEBUG;
-// @ts-expect-error The writer's key list cannot be modified independently of validation.
+// @ts-expect-error The schema's key list is readonly.
 definition.keys.push("API_KEY");
 void debug;
