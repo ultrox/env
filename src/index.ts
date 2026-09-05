@@ -9,6 +9,7 @@ export {
 } from "./descriptors.js";
 export type { Descriptor } from "./descriptors.js";
 export type { EnvSchema, InferEnv } from "./parse.js";
+export { EnvValidationError } from "./errors.js";
 
 import type { Descriptor } from "./descriptors.js";
 import { parse, type EnvSchema, type InferEnv } from "./parse.js";
