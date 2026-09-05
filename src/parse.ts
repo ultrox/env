@@ -19,12 +19,23 @@ export function parse<S extends EnvSchema>(
   schema: S,
   source: Record<string, string | undefined>,
 ): { data: InferEnv<S>; warnings: string[] } {
-  const data = {} as Record<string, unknown>;
+  if (typeof source !== "object" || source === null || Array.isArray(source)) {
+    throw new Error("Invalid environment source: expected an object");
+  }
+  const data: Record<string, unknown> = Object.create(null);
   const errors: string[] = [];
   const warnings: string[] = [];
 
   for (const [key, descriptor] of Object.entries(schema)) {
-    const raw = source[key];
+    const raw = Object.hasOwn(source, key) ? source[key] : undefined;
+    if (raw !== undefined && typeof raw !== "string") {
+      errors.push(`${key}: expected a string`);
+      continue;
+    }
+    if (raw?.includes("\0")) {
+      errors.push(`${key}: must not contain a null byte`);
+      continue;
+    }
 
     if (descriptor.type === "string") {
       const d = descriptor as StringDescriptor;
@@ -61,17 +72,17 @@ export function parse<S extends EnvSchema>(
       }
 
       const num = Number(trimmed);
-      if (isNaN(num)) {
-        errors.push(`${key}: expected number, got "${trimmed}"`);
+      if (!Number.isFinite(num)) {
+        errors.push(`${key}: expected number (finite)`);
         data[key] = 0;
         continue;
       }
 
       if (d.minVal !== undefined && num < d.minVal) {
-        errors.push(`${key}: min ${d.minVal}, got ${num}`);
+        errors.push(`${key}: min ${d.minVal}`);
       }
       if (d.maxVal !== undefined && num > d.maxVal) {
-        errors.push(`${key}: max ${d.maxVal}, got ${num}`);
+        errors.push(`${key}: max ${d.maxVal}`);
       }
 
       data[key] = num;
@@ -88,7 +99,7 @@ export function parse<S extends EnvSchema>(
         data[key] = false;
       } else {
         errors.push(
-          `${key}: expected boolean (true/false/1/0), got "${trimmed}"`,
+          `${key}: expected boolean (true/false/1/0)`,
         );
         data[key] = false;
       }
@@ -97,7 +108,7 @@ export function parse<S extends EnvSchema>(
 
   if (errors.length) {
     throw new Error(
-      `Missing required env vars:\n${errors.join("\n")}`,
+      `Invalid environment variables:\n${errors.join("\n")}`,
     );
   }
 
@@ -105,5 +116,5 @@ export function parse<S extends EnvSchema>(
     console.warn(`Missing optional env vars: ${warnings.join(", ")}`);
   }
 
-  return { data: data as InferEnv<S>, warnings };
+  return { data: { ...data } as InferEnv<S>, warnings };
 }

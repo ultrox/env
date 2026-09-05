@@ -14,7 +14,10 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: node --test --experimental-test-coverage --test-coverage-include='src/**' --test-reporter=lcov --test-reporter-destination=coverage.lcov --test-reporter=spec --test-reporter-destination=stdout --import tsx/esm test/index.test.ts
+      - run: sudo apt-get update && sudo apt-get install -y direnv
+      - run: npm run typecheck
+      - run: npm run build
+      - run: node --test --experimental-test-coverage --test-coverage-include='src/**' --test-reporter=lcov --test-reporter-destination=coverage.lcov --test-reporter=spec --test-reporter-destination=stdout --import tsx/esm test/*.test.ts
       - uses: codecov/codecov-action@v5
         with:
           files: coverage.lcov

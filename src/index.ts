@@ -9,30 +9,37 @@ export {
 } from "./descriptors.js";
 export type { Descriptor } from "./descriptors.js";
 export type { EnvSchema, InferEnv } from "./parse.js";
+export type { WriteEnvFileOptions } from "./cli.js";
 
 import type { Descriptor } from "./descriptors.js";
 import { parse, type EnvSchema, type InferEnv } from "./parse.js";
-import { writeEnvFile as writeEnvFileImpl } from "./cli.js";
+import { writeEnvFile as writeEnvFileImpl, type WriteEnvFileOptions } from "./cli.js";
 
 export interface Env<S extends EnvSchema> {
   parse(
     source: Record<string, string | undefined>,
   ): { data: InferEnv<S>; warnings: string[] };
-  writeEnvFile(options: { source: string | Record<string, string | undefined>; output: string }): void;
-  keys: (keyof S & string)[];
+  writeEnvFile(options: WriteEnvFileOptions): void;
+  keys: readonly (keyof S & string)[];
 }
 
 export function createEnv<const S extends Record<string, Descriptor>>(
   schema: S,
 ): Env<S> {
-  const keys = Object.keys(schema) as (keyof S & string)[];
+  const schemaSnapshot = { ...schema };
+  const keys = Object.freeze(Object.keys(schemaSnapshot) as (keyof S & string)[]);
+  for (const key of keys) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+      throw new Error(`Invalid environment variable name: ${JSON.stringify(key)}`);
+    }
+  }
 
   return {
     parse(source) {
-      return parse(schema, source);
+      return parse(schemaSnapshot, source);
     },
     writeEnvFile(options) {
-      writeEnvFileImpl({ keys, parse: (source) => parse(schema, source) }, options);
+      writeEnvFileImpl({ keys, parse: (source) => parse(schemaSnapshot, source) }, options);
     },
     keys,
   };
