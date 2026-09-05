@@ -1,6 +1,6 @@
 {
   "name": "@ma.vu/env",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "Zero-dependency env validation with builder API",
   "type": "module",
   "main": "./dist/index.js",
