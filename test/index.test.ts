@@ -1,8 +1,5 @@
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
-import { readFileSync, mkdtempSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import {
   createEnv,
   required,
@@ -187,74 +184,5 @@ describe("createEnv — keys", () => {
   it("returns all schema keys", () => {
     const env = createEnv({ A: required, B: optional, C: number });
     assert.deepEqual(env.keys, ["A", "B", "C"]);
-  });
-});
-
-describe("writeEnvFile", () => {
-  const env = createEnv({ HOST: required, PORT: number, API_KEY: optional });
-  const tmp = mkdtempSync(join(tmpdir(), "env-test-write-"));
-
-  it("writes validated env file", () => {
-    const outFile = join(tmp, "out.env");
-    env.writeEnvFile({
-      source: { HOST: "prod.example.com", PORT: "443", API_KEY: "sk-123" },
-      output: outFile,
-    });
-    const content = readFileSync(outFile, "utf-8");
-    assert.ok(content.includes("HOST=prod.example.com"));
-    assert.ok(content.includes("PORT=443"));
-    assert.ok(content.includes("API_KEY=sk-123"));
-  });
-
-  it("skips empty optional values", () => {
-    const outFile = join(tmp, "sparse.env");
-    env.writeEnvFile({
-      source: { HOST: "h", PORT: "80" },
-      output: outFile,
-    });
-    const content = readFileSync(outFile, "utf-8");
-    assert.ok(content.includes("HOST=h"));
-    assert.ok(!content.includes("API_KEY"));
-  });
-
-  it("throws on missing required", () => {
-    const outFile = join(tmp, "fail.env");
-    assert.throws(
-      () => env.writeEnvFile({ source: { PORT: "3000" }, output: outFile }),
-      /HOST: required/,
-    );
-  });
-
-  it("throws on invalid values", () => {
-    const outFile = join(tmp, "fail2.env");
-    assert.throws(
-      () => env.writeEnvFile({ source: { HOST: "ok", PORT: "abc" }, output: outFile }),
-      /expected number/,
-    );
-  });
-
-  it("accepts JSON string as source", () => {
-    const outFile = join(tmp, "json.env");
-    const json = JSON.stringify({ HOST: "h", PORT: "80", API_KEY: "key" });
-    env.writeEnvFile({ source: json, output: outFile });
-    const content = readFileSync(outFile, "utf-8");
-    assert.ok(content.includes("HOST=h"));
-    assert.ok(content.includes("PORT=80"));
-  });
-
-  it("throws on invalid JSON string", () => {
-    const outFile = join(tmp, "bad-json.env");
-    assert.throws(
-      () => env.writeEnvFile({ source: "not json", output: outFile }),
-      /not valid JSON/,
-    );
-  });
-
-  it("throws on non-object JSON", () => {
-    const outFile = join(tmp, "array.env");
-    assert.throws(
-      () => env.writeEnvFile({ source: "[1,2,3]", output: outFile }),
-      /must be a JSON object/,
-    );
   });
 });

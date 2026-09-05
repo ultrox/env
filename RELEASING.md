@@ -6,7 +6,7 @@ This package follows the same Changesets release flow as `@ma.vu/app-money`, usi
 2. On a push to `main`, `.github/workflows/release.yml` creates or updates a `chore: release @ma.vu/env` pull request containing the new version, lockfile, and changelog.
 3. Merge that version pull request to publish to npm, push the matching git tag, and create a GitHub Release. `workflow_dispatch` can retry the flow on `main`.
 
-The workflow uses the same pinned Changesets actions as app-money, separate version/publish permissions, and a serialized release concurrency group. `prepublishOnly` runs type checking, the tests, and a fresh build before publication. The publish runner installs direnv so loader compatibility tests run there too.
+The workflow uses the same pinned Changesets actions as app-money, separate version/publish permissions, and a serialized release concurrency group. `prepublishOnly` runs type checking, the tests, and a fresh build before publication.
 
 ## Repository and npm setup
 
