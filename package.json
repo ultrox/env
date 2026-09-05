@@ -16,10 +16,10 @@
   ],
   "scripts": {
     "build": "tsup",
-    "test": "node --test --import tsx/esm test/*.test.ts",
+    "test": "npm run build && node --test --import tsx/esm test/*.test.ts",
     "typecheck": "tsc -p tsconfig.test.json",
     "changeset": "changeset",
-    "check": "npm run typecheck && npm run build && npm test",
+    "check": "npm run typecheck && npm test",
     "prepublishOnly": "npm run check",
     "release": "npm publish --access public && changeset git-tag",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts"
@@ -41,6 +41,6 @@
     "typescript": "^5.0.0"
   },
   "bin": {
-    "mavu-env": "./dist/cli.js"
+    "mavu-env": "dist/cli.js"
   }
 }

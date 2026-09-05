@@ -85,7 +85,7 @@ Keep this environment module on the server when it contains secrets. Browser con
 
 ### Validate locally and in CI
 
-The package includes a CLI; no custom validation script is needed. It requires Node 22.18+ or 24+. The core remains independent of Node.
+The package includes a CLI; no custom validation script is needed. It requires Node 22.18+, 23.6+, or 24+. The core remains independent of Node.
 
 ```sh
 # After direnv supplies your local values:
@@ -119,7 +119,7 @@ npx @ma.vu/env export \
   docker run --env-file .env.deploy "$IMAGE"
 ```
 
-Repeat `--schema` for multiple apps. Export includes only schema keys and rejects conflicting parsed values. The file uses Docker's literal format: **do not source it as a shell script** or assume it is interchangeable with Compose's interpolated `.env`. Export is a CLI operation; the core has no file-writing method.
+Repeat `--schema` for multiple apps. Export includes only schema keys and rejects conflicting parsed values and unsafe numeric integers. Use string schemas for exact IDs and large integers. The file uses Docker's literal format: **do not source it as a shell script** or assume it is interchangeable with Compose's interpolated `.env`. Export is a CLI operation; the core has no file-writing method.
 
 Read the [local and CI workflow guide](./docs/cli.md) for setup, failure behavior, Docker handoff and TypeScript loading. See [backend, web and React Native examples](./examples/README.md) for each platform's typed `env` boundary.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { randomUUID } from "node:crypto";
-import { rename, unlink, writeFile } from "node:fs/promises";
+import { rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -19,7 +19,7 @@ Options:
   --output       Destination file; replaced only after all validation succeeds.
   --help         Show this help.
 
-Requires Node 22.18+ or 24+. TypeScript schemas use native type stripping.
+Requires Node 22.18+, 23.6+, or 24+. TypeScript schemas use native type stripping.
 Validation failures exit 1; usage errors exit 2. Values are never printed.
 `;
 
@@ -110,8 +110,16 @@ function isSchema(value: unknown): value is Env<EnvSchema> {
 
 async function loadSchema(specifier: string): Promise<Env<EnvSchema>> {
   const separator = specifier.lastIndexOf("#");
-  const path = separator < 0 ? specifier : specifier.slice(0, separator);
-  const exportName = separator < 0 ? undefined : specifier.slice(separator + 1);
+  let path = specifier;
+  let exportName: string | undefined;
+  if (separator >= 0) {
+    // Prefer an existing literal filename, which may itself contain '#'.
+    const literalFile = await stat(resolve(specifier)).then((entry) => entry.isFile(), () => false);
+    if (!literalFile) {
+      path = specifier.slice(0, separator);
+      exportName = specifier.slice(separator + 1);
+    }
+  }
   let module: Record<string, unknown>;
   try {
     module = await import(pathToFileURL(resolve(path)).href);
@@ -120,10 +128,11 @@ async function loadSchema(specifier: string): Promise<Env<EnvSchema>> {
     throw new CliError("Cannot load schema. Check its path, imports and Node-compatible syntax; keep environment reads out of the schema module.");
   }
   if (exportName !== undefined) {
-    if (!Object.hasOwn(module, exportName) || !isSchema(module[exportName])) {
+    const selected = module[exportName];
+    if (!Object.hasOwn(module, exportName) || !isSchema(selected)) {
       throw new CliError("Selected export must be a createEnv() schema.");
     }
-    return module[exportName];
+    return selected;
   }
   if (isSchema(module.default)) return module.default;
   const candidates = [...new Set(Object.values(module).filter(isSchema))];
@@ -167,6 +176,9 @@ function dockerEnv(results: Validated[]): string {
       if (!Object.hasOwn(data, key) || !isSerializable(value)) {
         throw new CliError(`${key}: schema did not return a serializable value.`);
       }
+      if (typeof value === "number" && Number.isInteger(value) && !Number.isSafeInteger(value)) {
+        throw new CliError(`${key}: unsafe integer cannot be exported; use a string schema for exact IDs or large integers.`);
+      }
       if (merged.has(key) && !Object.is(merged.get(key), value)) {
         throw new CliError(`${key}: schemas produce conflicting values; export separate files for these applications.`);
       }
@@ -208,7 +220,7 @@ async function main(): Promise<void> {
   }
   const [major = 0, minor = 0] = process.versions.node.split(".").map(Number);
   if (major < 22 || (major === 22 && minor < 18) || (major === 23 && minor < 6)) {
-    throw new CliError("The CLI requires Node 22.18+ or 24+. The core library has no Node dependency.");
+    throw new CliError("The CLI requires Node 22.18+, 23.6+, or 24+. The core library has no Node dependency.");
   }
   const source = readSource(config.sourceEnv);
   const results = await validate(config.schemas, source);

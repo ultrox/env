@@ -2,7 +2,7 @@
 
 Copy the relevant `env.schema.ts` and `env.ts` into your application's source directory. Install `@ma.vu/env`, and have the rest of the application import `env` from that one module. These are integration examples, not complete applications.
 
-Run the CLI with Node 22.18+ or 24+, regardless of the application's runtime. The validation core has no Node imports or runtime dependencies.
+Run the CLI with Node 22.18+, 23.6+, or 24+, regardless of the application's runtime. The validation core has no Node imports or runtime dependencies.
 
 ## Backend
 

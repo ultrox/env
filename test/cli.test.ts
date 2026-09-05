@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -178,11 +178,11 @@ test("successful replacement resets file permissions and write failures clean te
 });
 
 test("Docker consumes exported values literally", { skip: process.env.MAVU_TEST_DOCKER !== "1" }, () => {
-  const { output, args } = exportArgs(schema("{ TOKEN: required, PORT: number, DEBUG: boolean, EMPTY: optional }"));
+  const { output, args } = exportArgs(schema("{ TOKEN: required, PORT: number, DEBUG: boolean, EMPTY: optional, BIG_ID: required }"));
   const literal = `${secret} #hash=$HOME \\ backslash 'single' \"double\" = 💜`;
-  assert.equal(run(args, { CI_CONFIG: JSON.stringify({ TOKEN: literal, PORT: "0", DEBUG: "false" }) }).status, 0);
-  const received = execFileSync("docker", ["run", "--rm", "--env-file", output, "alpine:3.22", "sh", "-c", 'printf "%s\\n" "$TOKEN" "$PORT" "$DEBUG" "$EMPTY"'], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  assert.equal(received, `${literal}\n0\nfalse\n\n`);
+  assert.equal(run(args, { CI_CONFIG: JSON.stringify({ TOKEN: literal, PORT: "0", DEBUG: "false", BIG_ID: "12345678901234567890" }) }).status, 0);
+  const received = execFileSync("docker", ["run", "--rm", "--env-file", output, "alpine:3.22", "sh", "-c", 'printf "%s\\n" "$TOKEN" "$PORT" "$DEBUG" "$EMPTY" "$BIG_ID"'], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  assert.equal(received, `${literal}\n0\nfalse\n\n12345678901234567890\n`);
 });
 
 test("documented platform schemas validate from the installed package", () => {
@@ -209,4 +209,44 @@ test("projects can opt into tsx for schemas requiring TypeScript transforms", ()
     env: { PATH: process.env.PATH, NODE_OPTIONS: "--import tsx", PORT: "3000" },
   });
   assert.equal(result.status, 0, result.stderr);
+});
+
+test("loads literal hash paths and still selects exports from them", () => {
+  const folder = join(directory, "build#1");
+  mkdirSync(folder);
+  for (const filename of ["env.schema.ts", "env#schema.ts"]) {
+    const path = join(folder, filename);
+    writeFileSync(path, "import { createEnv, required } from '@ma.vu/env'; export default createEnv({ TOKEN: required }); export const jobs = createEnv({ JOB: required });");
+    const literal = run(["check", "--schema", path], { TOKEN: secret });
+    assert.equal(literal.status, 0, literal.stderr);
+    const selected = run(["check", "--schema", `${path}#jobs`], { JOB: secret });
+    assert.equal(selected.status, 0, selected.stderr);
+  }
+});
+
+test("unsafe numeric integers fail export without revealing values or replacing output", () => {
+  const path = schema("{ BIG_ID: number, TOKEN: required }");
+  for (const value of ["9007199254740992", "-9007199254740992", "12345678901234567890", "-12345678901234567890", "1000000000000000000000", "1e100"]) {
+    const { output, args } = exportArgs(path);
+    const source = { CI_CONFIG: JSON.stringify({ BIG_ID: value, TOKEN: secret }) };
+    for (const existing of [false, true]) {
+      if (existing) writeFileSync(output, "previous output\n");
+      const result = run(args, source);
+      assertFailure(result);
+      assert.match(result.stderr, /BIG_ID: unsafe integer/);
+      assert.ok(!result.stderr.includes(value));
+      assert.ok(!result.stderr.includes(String(Number(value))));
+      if (existing) assert.equal(readFileSync(output, "utf8"), "previous output\n");
+      else assert.equal(existsSync(output), false);
+    }
+  }
+});
+
+test("safe integer boundaries, fractions and exact string IDs export successfully", () => {
+  const path = schema("{ MIN: number, MAX: number, ZERO: number, EXP: number, DECIMAL: number, TINY: number, ID: required, HUGE: required }");
+  const { output, args } = exportArgs(path);
+  const source = { MIN: "-9007199254740991", MAX: "9007199254740991", ZERO: "00", EXP: "1e3", DECIMAL: "1.25", TINY: "0.0000001", ID: "12345678901234567890", HUGE: "1000000000000000000000" };
+  const result = run(args, { CI_CONFIG: JSON.stringify(source) });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(output, "utf8"), "MIN=-9007199254740991\nMAX=9007199254740991\nZERO=0\nEXP=1000\nDECIMAL=1.25\nTINY=1e-7\nID=12345678901234567890\nHUGE=1000000000000000000000\n");
 });

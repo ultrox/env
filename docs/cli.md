@@ -2,7 +2,7 @@
 
 Install `@ma.vu/env` in your project and commit the lockfile. The package provides the `mavu-env` executable, also available through `npx @ma.vu/env`. Use the installed executable in package scripts so CI runs the locked version.
 
-The CLI needs Node **22.18+ or 24+**. The core library stays independent of Node and has no runtime dependencies.
+The CLI needs Node **22.18+, 23.6+, or 24+**. The core library stays independent of Node and has no runtime dependencies.
 
 ## One contract, three validation points
 
@@ -114,6 +114,8 @@ Prefer a default schema export. A single named schema (`env`, `envSchema`, or an
 npx @ma.vu/env check --schema './config/schemas.ts#web'
 ```
 
+An existing literal file path takes precedence, including filenames or directories containing `#`. Otherwise the final `#` selects an export.
+
 Imports resolve from the schema module; schema paths resolve from the current working directory. The CLI imports schemas, not the app's initialized `env.ts`.
 
 ## Generate Docker's env file
@@ -152,6 +154,7 @@ Set `WEB_IMAGE` in the job and retain the application's existing smoke assertion
 The exporter:
 
 - Writes only schema keys, using parsed values: numbers and booleans are normalized, optional empty strings remain `KEY=`. Unknown source keys are excluded.
+- Rejects numeric integers outside JavaScript's safe range (`-9007199254740991` to `9007199254740991`) before writing. Declare exact IDs and large integers as `required` strings to preserve their digits. The core `number` parser and `check` still use JavaScript `Number` semantics; fractional values also have IEEE-754 precision limits, so use strings for exact decimal representations.
 - Combines matching shared keys. If schemas return different types or values for a shared key, export fails; export separate files for those applications.
 - Writes raw `KEY=value` lines. Docker treats quotes, dollar signs, `#`, equals signs and backslashes as literal value characters. It does not use shell escaping. See [Docker's env-file parser](https://github.com/docker/cli/blob/master/pkg/kvfile/kvfile.go).
 - Rejects values that cannot be represented: embedded CR/LF, null bytes, invalid Unicode or lines of 64 KiB or more. Schema string trimming still applies before export.
