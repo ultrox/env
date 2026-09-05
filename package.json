@@ -17,7 +17,6 @@
   "scripts": {
     "build": "tsup",
     "test": "node --test --import tsx/esm test/*.test.ts",
-    "test:coverage": "node --test --experimental-test-coverage --import tsx/esm test/*.test.ts",
     "typecheck": "tsc -p tsconfig.test.json",
     "changeset": "changeset",
     "check": "npm run typecheck && npm test && npm run build",

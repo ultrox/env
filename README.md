@@ -3,7 +3,6 @@
 Zero-dependency env validation with a builder API. Type-safe, no schema library needed.
 
 [![npm](https://img.shields.io/npm/v/@ma.vu/env)](https://www.npmjs.com/package/@ma.vu/env)
-[![codecov](https://codecov.io/gh/ultrox/env/graph/badge.svg)](https://codecov.io/gh/ultrox/env)
 
 ## Why
 
