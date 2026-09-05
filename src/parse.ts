@@ -4,6 +4,7 @@ import type {
   NumberDescriptor,
   BooleanDescriptor,
 } from "./descriptors.js";
+import { EnvValidationError } from "./errors.js";
 
 export type EnvSchema = Record<string, Descriptor>;
 
@@ -20,7 +21,7 @@ export function parse<S extends EnvSchema>(
   source: Record<string, string | undefined>,
 ): { data: InferEnv<S>; warnings: string[] } {
   if (typeof source !== "object" || source === null || Array.isArray(source)) {
-    throw new Error("Invalid environment source: expected an object");
+    throw new EnvValidationError("Invalid environment source: expected an object");
   }
   const data: Record<string, unknown> = Object.create(null);
   const errors: string[] = [];
@@ -107,7 +108,7 @@ export function parse<S extends EnvSchema>(
   }
 
   if (errors.length) {
-    throw new Error(
+    throw new EnvValidationError(
       `Invalid environment variables:\n${errors.join("\n")}`,
     );
   }

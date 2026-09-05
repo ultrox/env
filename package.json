@@ -19,7 +19,7 @@
     "test": "node --test --import tsx/esm test/*.test.ts",
     "typecheck": "tsc -p tsconfig.test.json",
     "changeset": "changeset",
-    "check": "npm run typecheck && npm test && npm run build",
+    "check": "npm run typecheck && npm run build && npm test",
     "prepublishOnly": "npm run check",
     "release": "npm publish --access public && changeset git-tag",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts"
@@ -39,5 +39,8 @@
     "tsup": "^8.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
+  },
+  "bin": {
+    "mavu-env": "./dist/cli.js"
   }
 }

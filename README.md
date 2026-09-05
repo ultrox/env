@@ -83,36 +83,45 @@ Validation throws before the importing module can use invalid configuration. Mis
 
 Keep this environment module on the server when it contains secrets. Browser configuration needs its own schema containing only public values.
 
-### Validate locally
+### Validate locally and in CI
 
-Load local values with direnv as described above. A small command can validate them before starting your dev server or running a build:
-
-```ts
-// bin/validate-env.ts
-import '../src/env';
-```
+The package includes a CLI; no custom validation script is needed. It requires Node 22.18+ or 24+. The core remains independent of Node.
 
 ```sh
-npx tsx bin/validate-env.ts && npm run dev
+# After direnv supplies your local values:
+npx @ma.vu/env check --schema ./src/env.schema.ts
 ```
 
-### Validate deployment inputs in CI
-
-Run the same validation command with the environment supplied by your CI runner:
+In CI, run after `npm ci`, with values supplied by the runner or an explicit JSON source:
 
 ```yaml
 - name: Validate deployment configuration
   env:
-    API_KEY: ${{ secrets.API_KEY }}
-    DATABASE_URL: ${{ secrets.DATABASE_URL }}
-    PORT: ${{ vars.PORT }}
-    DEBUG: ${{ vars.DEBUG }}
-  run: npx tsx bin/validate-env.ts
+    CI_CONFIG: ${{ toJSON(secrets) }}
+  run: npx @ma.vu/env check --schema ./src/env.schema.ts --source-env CI_CONFIG
 ```
 
-The command imports the same application environment module used locally, so the same schema and rules apply. Missing or invalid configuration fails the step before deployment. Errors identify keys and rules without printing their values. Pass any optional configuration your app uses through the step environment as well.
+The CLI imports the schema, validates it, and exits nonzero on failure. JSON must contain string values; it is never interpolated into the shell command. Without `--source-env`, the CLI validates `process.env`. Neither mode loads `.env` files.
 
-The deployment platform supplies the environment when the app starts, and the application's `env` module validates it again. The library does not read or write environment files.
+Make validation part of your build script (`mavu-env check --schema ./src/env.schema.ts && your-build-command`) and require the CI job before deployment. The application still parses its actual environment on startup. Type-safe access cannot prevent other modules reading raw environment values; enforce that boundary with lint.
+
+### Export validated configuration for Docker
+
+For deployment systems that need a file, the separate CLI exporter handles validation and serialization:
+
+```sh
+npx @ma.vu/env export \
+  --schema ./apps/web/src/env.schema.ts \
+  --schema ./apps/jobs/src/env.schema.ts \
+  --source-env CI_CONFIG \
+  --format docker-env \
+  --output .env.deploy && \
+  docker run --env-file .env.deploy "$IMAGE"
+```
+
+Repeat `--schema` for multiple apps. Export includes only schema keys and rejects conflicting parsed values. The file uses Docker's literal format: **do not source it as a shell script** or assume it is interchangeable with Compose's interpolated `.env`. Export is a CLI operation; the core has no file-writing method.
+
+Read the [local and CI workflow guide](./docs/cli.md) for setup, failure behavior, Docker handoff and TypeScript loading. See [backend, web and React Native examples](./examples/README.md) for each platform's typed `env` boundary.
 
 ### Keep raw environment access at the boundary
 
@@ -159,7 +168,7 @@ number.min(1).max(65535) // numeric range
 
 Returns an object with:
 
-- **`parse(source)`** — validates a string-valued object against the schema. Throws on errors, warns on missing optional. Returns `{ data, warnings }`. Ignores undeclared keys and inherited properties; rejects non-string values and null bytes.
+- **`parse(source)`** — validates a string-valued object against the schema. Throws `EnvValidationError` on invalid input, warns on missing optional. Returns `{ data, warnings }`. Ignores undeclared keys and inherited properties; rejects non-string values and null bytes.
 - **`keys`** — frozen, readonly array of all schema keys. Names must match `[A-Za-z_][A-Za-z0-9_]*`. The schema key-to-descriptor mapping is copied when `createEnv()` is called.
 
 ## Releasing
